@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Customer Churn KPI Dashboard</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+:root{
+  --ink:#172033;--muted:#52627a;--line:#dbe3ee;--bg:#f6f8fb;--card:#fff;
+  --navy:#16324f;--cyan:#1d9bf0;--teal:#087f8c;--amber:#b76e00;--red:#b42318;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Segoe UI,Arial,sans-serif;line-height:1.45}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 22px 50px}
+h1{margin:0 0 6px;font-size:34px;letter-spacing:-.5px;color:var(--navy)}
+h2{font-size:20px;margin:0 0 12px;color:var(--navy)}
+h3{font-size:16px;margin:0 0 8px}
+.sub{color:var(--muted);margin:0 0 20px}
+.banner{background:#eef8fd;border-left:5px solid var(--cyan);padding:15px 17px;border-radius:8px;margin:0 0 20px}
+.controls,.kpis,.grid{display:grid;gap:14px}
+.controls{grid-template-columns:repeat(4,1fr);background:var(--card);padding:16px;border:1px solid var(--line);border-radius:10px;margin-bottom:18px}
+label{font-size:13px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px}
+select,button{width:100%;padding:10px 11px;border:1px solid #b8c5d6;border-radius:7px;background:white;color:var(--ink);font-size:14px}
+button{cursor:pointer;background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
+.kpis{grid-template-columns:repeat(5,1fr);margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;box-shadow:0 1px 2px rgba(20,40,70,.03)}
+.kpi-label{font-size:13px;color:var(--muted);font-weight:700}
+.kpi-value{font-size:28px;font-weight:800;margin-top:4px;color:var(--navy)}
+.kpi-note{font-size:12px;color:var(--muted);margin-top:4px}
+.grid{grid-template-columns:1fr 1fr;margin-bottom:18px}
+.chart{height:360px}
+.insight{background:#fffaf0;border-left:4px solid var(--amber);padding:12px 14px;border-radius:6px;margin-top:10px;color:#5b4200}
+.note{background:#f2f8f5;border-left:4px solid var(--teal);padding:13px 14px;border-radius:6px;margin-top:18px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+.small{font-size:12px;color:var(--muted)}
+.pill{display:inline-block;padding:3px 7px;border-radius:999px;font-size:11px;font-weight:700}
+.pill.yes{background:#fde8e7;color:var(--red)} .pill.no{background:#e7f5ef;color:#08734f}
+@media(max-width:900px){.controls,.kpis,.grid{grid-template-columns:1fr 1fr}.kpis .card:last-child{grid-column:span 2}}
+@media(max-width:600px){.controls,.kpis,.grid{grid-template-columns:1fr}.kpis .card:last-child{grid-column:auto}.chart{height:310px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Customer Churn KPI Dashboard</h1>
+  <p class="sub">Interactive view of churn, retention, revenue risk, tenure, and customer segments.</p>
+
+  <div class="banner"><strong>Decision question:</strong> Which customer groups should a subscription team contact first to reduce avoidable churn?</div>
+
+  <section class="controls">
+    <div><label for="contract">Contract</label><select id="contract"></select></div>
+    <div><label for="tenure">Tenure</label><select id="tenure"></select></div>
+    <div><label for="payment">Payment method</label><select id="payment"></select></div>
+    <div><label>&nbsp;</label><button id="reset">Reset filters</button></div>
+  </section>
+
+  <section class="kpis">
+    <div class="card"><div class="kpi-label">Customers</div><div id="kCustomers" class="kpi-value">—</div><div class="kpi-note">Customers in current filter</div></div>
+    <div class="card"><div class="kpi-label">Churn rate</div><div id="kChurn" class="kpi-value">—</div><div class="kpi-note">Churned ÷ customers</div></div>
+    <div class="card"><div class="kpi-label">Retention rate</div><div id="kRetention" class="kpi-value">—</div><div class="kpi-note">1 − churn rate</div></div>
+    <div class="card"><div class="kpi-label">Revenue at risk</div><div id="kRisk" class="kpi-value">—</div><div class="kpi-note">Monthly charges from churned customers</div></div>
+    <div class="card"><div class="kpi-label">Avg. tenure</div><div id="kTenure" class="kpi-value">—</div><div class="kpi-note">Completed months</div></div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Churn rate by contract</h2>
+      <div id="contractChart" class="chart"></div>
+      <div id="contractInsight" class="insight"></div>
+    </div>
+    <div class="card">
+      <h2>Revenue at risk by payment method</h2>
+      <div id="paymentChart" class="chart"></div>
+      <div id="paymentInsight" class="insight"></div>
+    </div>
+    <div class="card">
+      <h2>Churn rate by tenure band</h2>
+      <div id="tenureChart" class="chart"></div>
+      <div id="tenureInsight" class="insight"></div>
+    </div>
+    <div class="card">
+      <h2>Customer segments in current filter</h2>
+      <div id="segmentChart" class="chart"></div>
+      <div id="segmentInsight" class="insight"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Filtered customer detail</h2>
+    <p class="small">Use this table to support outreach prioritization. It does not imply that any single factor causes churn.</p>
+    <div style="overflow:auto">
+      <table><thead><tr><th>Customer</th><th>Tenure</th><th>Contract</th><th>Payment</th><th>Subscription</th><th>Monthly charge</th><th>Tickets</th><th>Status</th></tr></thead>
+      <tbody id="detailBody"></tbody></table>
+    </div>
+  </section>
+
+  <section class="note">
+    <h3>Decision note</h3>
+    <div><strong>Audience:</strong> Subscription retention / customer success team.</div>
+    <div><strong>Decision:</strong> Prioritize high-churn groups for retention outreach.</div>
+    <div><strong>Supporting metrics:</strong> churn rate, revenue at risk, tenure, contract, and payment method.</div>
+    <div><strong>Uncertainty:</strong> This is a small fictional sample (15 customers); the dashboard is descriptive, not a causal or predictive model.</div>
+    <div><strong>Next measurement:</strong> Recalculate these KPIs on a larger rolling cohort and track post-outreach churn, renewal, and retained monthly revenue.</div>
+  </section>
+
+  <p class="small" style="margin-top:18px">
+    KPI definitions: churn rate = churned customers ÷ filtered customers; retention rate = 1 − churn rate;
+    revenue at risk = sum of monthly charges for churned customers; tenure KPI = average completed tenure months.
+  </p>
+</div>
+
+<script>
+const DATA = [{"customer_id":"CUST-1001","gender":"Female","age":34,"tenure_months":12,"subscription_type":"Basic","monthly_charge":49.99,"total_charges":599.88,"contract_type":"Month-to-Month","support_tickets":3,"payment_method":"Credit Card","churned":"Yes","churn_flag":1},{"customer_id":"CUST-1002","gender":"Male","age":45,"tenure_months":24,"subscription_type":"Pro","monthly_charge":79.99,"total_charges":1919.76,"contract_type":"One Year","support_tickets":1,"payment_method":"Bank Transfer","churned":"No","churn_flag":0},{"customer_id":"CUST-1003","gender":"Female","age":29,"tenure_months":6,"subscription_type":"Basic","monthly_charge":49.99,"total_charges":299.94,"contract_type":"Month-to-Month","support_tickets":5,"payment_method":"UPI","churned":"Yes","churn_flag":1},{"customer_id":"CUST-1004","gender":"Male","age":52,"tenure_months":36,"subscription_type":"Enterprise","monthly_charge":149.99,"total_charges":5399.64,"contract_type":"Two Year","support_tickets":0,"payment_method":"Credit Card","churned":"No","churn_flag":0},{"customer_id":"CUST-1005","gender":"Female","age":41,"tenure_months":8,"subscription_type":"Pro","monthly_charge":79.99,"total_charges":639.92,"contract_type":"Month-to-Month","support_tickets":4,"payment_method":"Debit Card","churned":"Yes","churn_flag":1},{"customer_id":"CUST-1006","gender":"Male","age":31,"tenure_months":18,"subscription_type":"Basic","monthly_charge":49.99,"total_charges":899.82,"contract_type":"One Year","support_tickets":2,"payment_method":"UPI","churned":"No","churn_flag":0},{"customer_id":"CUST-1007","gender":"Female","age":23,"tenure_months":3,"subscription_type":"Basic","monthly_charge":49.99,"total_charges":149.97,"contract_type":"Month-to-Month","support_tickets":6,"payment_method":"Credit Card","churned":"Yes","churn_flag":1},{"customer_id":"CUST-1008","gender":"Male","age":60,"tenure_months":48,"subscription_type":"Enterprise","monthly_charge":149.99,"total_charges":7199.52,"contract_type":"Two Year","support_tickets":1,"payment_method":"Bank Transfer","churned":"No","churn_flag":0},{"customer_id":"CUST-1009","gender":"Female","age":38,"tenure_months":15,"subscription_type":"Pro","monthly_charge":79.99,"total_charges":1199.85,"contract_type":"One Year","support_tickets":2,"payment_method":"Credit Card","churned":"No","churn_flag":0},{"customer_id":"CUST-1010","gender":"Male","age":27,"tenure_months":4,"subscription_type":"Basic","monthly_charge":49.99,"total_charges":199.96,"contract_type":"Month-to-Month","support_tickets":4,"payment_method":"UPI","churned":"Yes","churn_flag":1},{"customer_id":"CUST-1011","gender":"Female","age":49,"tenure_months":30,"subscription_type":"Enterprise","monthly_charge":149.99,"total_charges":4499.7,"contract_type":"Two Year","support_tickets":0,"payment_method":"Credit Card","churned":"No","churn_flag":0},{"customer_id":"CUST-1012","gender":"Male","age":33,"tenure_months":14,"subscription_type":"Pro","monthly_charge":79.99,"total_charges":1119.86,"contract_type":"Month-to-Month","support_tickets":3,"payment_method":"Debit Card","churned":"Yes","churn_flag":1},{"customer_id":"CUST-1013","gender":"Female","age":55,"tenure_months":22,"subscription_type":"Basic","monthly_charge":49.99,"total_charges":1099.78,"contract_type":"One Year","support_tickets":1,"payment_method":"Bank Transfer","churned":"No","churn_flag":0},{"customer_id":"CUST-1014","gender":"Male","age":26,"tenure_months":2,"subscription_type":"Basic","monthly_charge":49.99,"total_charges":99.98,"contract_type":"Month-to-Month","support_tickets":5,"payment_method":"UPI","churned":"Yes","churn_flag":1},{"customer_id":"CUST-1015","gender":"Female","age":43,"tenure_months":40,"subscription_type":"Enterprise","monthly_charge":149.99,"total_charges":5999.6,"contract_type":"Two Year","support_tickets":1,"payment_method":"Credit Card","churned":"No","churn_flag":0}];
+const $ = id => document.getElementById(id);
+const money = x => "₹" + Number(x).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct = x => (x*100).toFixed(1) + "%";
+const tenureBand = m => m<=6 ? "0–6 months" : m<=12 ? "7–12 months" : m<=24 ? "13–24 months" : "25+ months";
+DATA.forEach(d => d.tenure_band = tenureBand(Number(d.tenure_months)));
+
+function options(select, values){
+  select.innerHTML = '<option value="All">All</option>' + values.sort().map(v=>`<option>${v}</option>`).join("");
+}
+options($("contract"), [...new Set(DATA.map(d=>d.contract_type))]);
+options($("payment"), [...new Set(DATA.map(d=>d.payment_method))]);
+options($("tenure"), ["0–6 months","7–12 months","13–24 months","25+ months"]);
+
+function filtered(){
+  return DATA.filter(d =>
+    ($("contract").value==="All" || d.contract_type===$("contract").value) &&
+    ($("payment").value==="All" || d.payment_method===$("payment").value) &&
+    ($("tenure").value==="All" || d.tenure_band===$("tenure").value)
+  );
+}
+function group(rows,key){
+  const map={};
+  rows.forEach(d=>{
+    const k=d[key]; if(!map[k]) map[k]={n:0,churn:0,risk:0,revenue:0};
+    map[k].n++; map[k].churn += d.churn_flag; map[k].revenue += +d.monthly_charge;
+    if(d.churn_flag) map[k].risk += +d.monthly_charge;
+  });
+  return Object.entries(map).map(([name,v])=>({name,...v,rate:v.churn/v.n})).sort((a,b)=>b.rate-a.rate);
+}
+const layoutBase={margin:{l:55,r:20,t:10,b:55},font:{family:"Inter,Segoe UI,Arial",color:"#172033"},paper_bgcolor:"white",plot_bgcolor:"white"};
+const config={responsive:true,displayModeBar:false};
+
+function draw(){
+  const rows=filtered(), n=rows.length, churn=rows.reduce((s,d)=>s+d.churn_flag,0), risk=rows.filter(d=>d.churn_flag).reduce((s,d)=>s+ +d.monthly_charge,0);
+  $("kCustomers").textContent=n;
+  $("kChurn").textContent=n?pct(churn/n):"—";
+  $("kRetention").textContent=n?pct(1-churn/n):"—";
+  $("kRisk").textContent=money(risk);
+  $("kTenure").textContent=n?(rows.reduce((s,d)=>s+ +d.tenure_months,0)/n).toFixed(1)+" mo":"—";
+
+  let g=group(rows,"contract_type");
+  Plotly.react("contractChart",[{
+    x:g.map(x=>x.name),y:g.map(x=>x.rate*100),type:"bar",
+    text:g.map(x=>pct(x.rate)),textposition:"outside",cliponaxis:false,
+    marker:{color:"#1d9bf0"}
+  }],{...layoutBase,yaxis:{title:"Churn rate (%)",range:[0,Math.max(110,Math.max(...g.map(x=>x.rate*100),0)+15)},xaxis:{title:"Contract"}},config);
+  $("contractInsight").innerHTML = g.length ? `<strong>Signal:</strong> ${g[0].name} has the highest observed churn in the current filter (${pct(g[0].rate)}).` : "No customers match the current filters.";
+
+  g=group(rows,"payment_method");
+  Plotly.react("paymentChart",[{
+    x:g.map(x=>x.name),y:g.map(x=>x.risk),type:"bar",
+    text:g.map(x=>money(x.risk)),textposition:"outside",cliponaxis:false,
+    marker:{color:"#087f8c"}
+  }],{...layoutBase,yaxis:{title:"Monthly revenue at risk (₹)"},xaxis:{title:"Payment method"}},config);
+  $("paymentInsight").innerHTML = g.length ? `<strong>Signal:</strong> ${g[0].name} carries the most monthly revenue at risk in the current filter (${money(g[0].risk)}).` : "No customers match the current filters.";
+
+  g=group(rows,"tenure_band");
+  const order=["0–6 months","7–12 months","13–24 months","25+ months"];
+  g.sort((a,b)=>order.indexOf(a.name)-order.indexOf(b.name));
+  Plotly.react("tenureChart",[{
+    x:g.map(x=>x.name),y:g.map(x=>x.rate*100),type:"bar",
+    text:g.map(x=>pct(x.rate)),textposition:"outside",cliponaxis:false,
+    marker:{color:"#b76e00"}
+  }],{...layoutBase,yaxis:{title:"Churn rate (%)",range:[0,Math.max(110,Math.max(...g.map(x=>x.rate*100),0)+15)},xaxis:{title:"Tenure band"}},config);
+  const early=g.filter(x=>["0–6 months","7–12 months"].includes(x.name));
+  $("tenureInsight").innerHTML = early.length ? `<strong>Signal:</strong> Early-tenure bands show the strongest observed churn pattern; use this as a retention hypothesis, not proof of causation.` : "No early-tenure customers match the current filters.";
+
+  g=group(rows,"subscription_type");
+  Plotly.react("segmentChart",[{
+    x:g.map(x=>x.name),y:g.map(x=>x.rate*100),type:"bar",
+    text:g.map(x=>`${pct(x.rate)} • ${x.n} customers`),textposition:"outside",cliponaxis:false,
+    marker:{color:"#16324f"}
+  }],{...layoutBase,yaxis:{title:"Churn rate (%)",range:[0,Math.max(110,Math.max(...g.map(x=>x.rate*100),0)+15)},xaxis:{title:"Subscription type"}},config);
+  $("segmentInsight").innerHTML = g.length ? `<strong>Signal:</strong> ${g[0].name} has the highest observed churn among subscription types (${pct(g[0].rate)}).` : "No customers match the current filters.";
+
+  $("detailBody").innerHTML=rows.map(d=>`<tr>
+    <td>${d.customer_id}</td><td>${d.tenure_months} mo</td><td>${d.contract_type}</td><td>${d.payment_method}</td>
+    <td>${d.subscription_type}</td><td>${money(d.monthly_charge)}</td><td>${d.support_tickets}</td>
+    <td><span class="pill ${d.churn_flag?'yes':'no'}">${d.churned}</span></td>
+  </tr>`).join("") || '<tr><td colspan="8">No customers match the current filters.</td></tr>';
+}
+["contract","tenure","payment"].forEach(id=>$(id).addEventListener("change",draw));
+$("reset").addEventListener("click",()=>{["contract","tenure","payment"].forEach(id=>$(id).value="All");draw()});
+draw();
+</script>
+</body>
+</html>
